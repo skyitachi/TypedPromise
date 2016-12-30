@@ -1,0 +1,16 @@
+{
+  "name": "promise",
+  "version": "0.0.1",
+  "description": "Typed Promise",
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/.bin/mocha test/test.js",
+    "build": "tsc --module commonjs index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "mocha": "^3.2.0"
+  }
+}
