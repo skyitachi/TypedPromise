@@ -22,22 +22,6 @@ describe("2.2.1", function () {
   });
 });
 
-describe("2.3", function () {
-  describe("2.3.1", function () {
-    it("promise.resolve(self) should reject TypeError", function (done) {
-      done();
-      // const p = new Promise(function (resolve) {
-      //   resolve(p);
-      // });
-      // p.catch(function(rejection) {
-      //   console.log(rejection);
-      //   assert(rejection instanceof TypeError);
-      //   done();
-      // });
-    });
-  });
-});
-
 describe("TypedPromise basic api", function () {
   it("resolve", function (done) {
     const tp = new TypedPromise(function (resolve) {
