@@ -1,7 +1,5 @@
 const assert = require("assert");
 const TypedPromise = require("../index.js").default;
-// test 2.2.1
-// 2.2.1.1
 
 describe("2.2.1", function () {
   describe("2.2.1.1 optional onFulfilled and onReject", function () {
