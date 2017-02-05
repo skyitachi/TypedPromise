@@ -1,7 +1,5 @@
 "use strict";
-/**
- * The Promise Resolution Procedure
- */
+var asap_1 = require("./lib/asap");
 function noop() {
 }
 function thenable(x) {
@@ -27,6 +25,9 @@ var TypedPromise = (function () {
         this._deferredState = 0 /* INITIAL */;
         this._deferred = null;
         this._executor = executor;
+        // TODO: why?
+        if (executor === noop)
+            return;
         TypedPromise.doResolve(this._executor, this);
     }
     TypedPromise.prototype.then = function (onFulfilled, onRejected) {
@@ -55,11 +56,15 @@ var TypedPromise = (function () {
             throw new TypeError("promise cannot resolve self");
         }
         // if value is thenable
-        if (thenable(value)) {
+        if (value instanceof TypedPromise) {
         }
         else {
             self._state = 1 /* FULFILLED */;
             self._value = value;
+            // Note: deal with deferred
+            if (self._deferredState === 1 /* RESOLVABLE */) {
+                TypedPromise.handle(self, self._deferred);
+            }
         }
     };
     TypedPromise.reject = function (promise, reason) {
@@ -69,27 +74,44 @@ var TypedPromise = (function () {
     TypedPromise.handleResolved = function (self, deferred) {
         var cb = deferred.onFulfilled;
         if (cb) {
-            var newValue = cb(self._value);
-            TypedPromise.resolve(deferred.promise, newValue);
+            // behavior like micro tasks
+            asap_1["default"](function () {
+                // newValue can be promise instance
+                var newValue = cb(self._value);
+                TypedPromise.resolve(deferred.promise, newValue);
+            });
         }
     };
     TypedPromise.handleRejected = function (self, deferred) {
         var cb = deferred.onRejected;
         if (cb) {
-            var reason = cb(self._reason);
-            TypedPromise.reject(self, reason);
+            // behavior like micro tasks
+            asap_1["default"](function () {
+                var reason = cb(self._reason);
+                TypedPromise.reject(self, reason);
+            });
         }
     };
     TypedPromise.handle = function (self, deferred) {
+        // while(self._state === PromiseState.ADOPTED) {
+        //   self = self._value;
+        // }
         switch (self._state) {
             case 0 /* PENDING */:
-                // TODO
+                // Note: stash the deferred, wait for the async task in current promise
+                if (self._deferredState === 0 /* INITIAL */) {
+                    self._deferredState = 1 /* RESOLVABLE */;
+                    self._deferred = deferred;
+                }
                 break;
             case 1 /* FULFILLED */:
                 TypedPromise.handleResolved(self, deferred);
                 break;
             case 2 /* REJECTED */:
                 TypedPromise.handleRejected(self, deferred);
+                break;
+            default:
+                // unexpected state
                 break;
         }
     };

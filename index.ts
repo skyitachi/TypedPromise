@@ -1,6 +1,5 @@
-/**
- * The Promise Resolution Procedure
- */
+import asap from "./lib/asap";
+
 function noop() {
 }
 
@@ -46,6 +45,8 @@ export default class TypedPromise {
 
   constructor(executor: Function) {
     this._executor = executor;
+    // TODO: why?
+    if (executor === noop) return;
     TypedPromise.doResolve(this._executor, this);
   }
 
@@ -75,11 +76,16 @@ export default class TypedPromise {
       throw new TypeError("promise cannot resolve self");
     }
     // if value is thenable
-    if (thenable(value)) {
-
+    if (value instanceof TypedPromise) {
+      // Note: should deal with self.deferred
+      //TypedPromise.doResolve(self.then.bind(self), value);
     } else { // value it not object or function
       self._state = PromiseState.FULFILLED;
       self._value = value;
+      // Note: deal with deferred
+      if (self._deferredState === DeferredState.RESOLVABLE) {
+        TypedPromise.handle(self, self._deferred);
+      }
     }
   }
 
@@ -91,23 +97,37 @@ export default class TypedPromise {
   private static handleResolved(self: TypedPromise, deferred: Deferred) {
     const cb = deferred.onFulfilled;
     if (cb) {
-      const newValue = cb(self._value);
-      TypedPromise.resolve(deferred.promise, newValue);
+      // behavior like micro tasks
+      asap(function () {
+        // newValue can be promise instance
+        const newValue = cb(self._value);
+        TypedPromise.resolve(deferred.promise, newValue);
+      });
     }
   }
 
   private static handleRejected(self: TypedPromise, deferred: Deferred) {
     const cb = deferred.onRejected;
     if (cb) {
-      const reason = cb(self._reason);
-      TypedPromise.reject(self, reason);
+      // behavior like micro tasks
+      asap(function () {
+        const reason = cb(self._reason);
+        TypedPromise.reject(self, reason);
+      });
     }
   }
 
   private static handle(self: TypedPromise, deferred: Deferred) {
+    // while(self._state === PromiseState.ADOPTED) {
+    //   self = self._value;
+    // }
     switch (self._state) {
       case PromiseState.PENDING:
-        // TODO
+        // Note: stash the deferred, wait for the async task in current promise
+        if (self._deferredState === DeferredState.INITIAL) {
+          self._deferredState = DeferredState.RESOLVABLE;
+          self._deferred = deferred;
+        }
         break;
       case PromiseState.FULFILLED:
         TypedPromise.handleResolved(self, deferred);
@@ -115,8 +135,9 @@ export default class TypedPromise {
       case PromiseState.REJECTED:
         TypedPromise.handleRejected(self, deferred);
         break;
-
+      default:
+        // unexpected state
+        break;
     }
   }
 }
-
