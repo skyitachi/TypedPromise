@@ -1,8 +1,7 @@
 import asap from "./lib/asap";
-
 function noop() {
 }
-
+let count = 0;
 function thenable(x) {
   return x && x.then && x.then instanceof Function;
 }
@@ -33,24 +32,21 @@ class Deferred {
 
 export default class TypedPromise {
   private _executor: Function;
-  private _defaultResolver = _ => {
-  };
-  private _defaultRejecter = _ => {
-  };
   private _state = PromiseState.PENDING;
   private _value = null;
   private _reason = null;
   private _deferredState = DeferredState.INITIAL;
   private _deferred = null;
+  // test
+  private _name = count++;
 
   constructor(executor: Function) {
     this._executor = executor;
-    // TODO: why?
     if (executor === noop) return;
     TypedPromise.doResolve(this._executor, this);
   }
 
-  public then(onFulfilled ?: any, onRejected ?: any) {
+  public then(onFulfilled ?: any, onRejected ?: any): TypedPromise {
     const ret = new TypedPromise(noop);
     // deal it as deferred
     TypedPromise.handle(this, new Deferred(ret, onFulfilled, onRejected));
@@ -75,11 +71,13 @@ export default class TypedPromise {
     if (self === value) {
       throw new TypeError("promise cannot resolve self");
     }
-    // if value is thenable
+    // if value is TypedPromise instance
     if (value instanceof TypedPromise) {
-      // Note: should deal with self.deferred
-      //TypedPromise.doResolve(self.then.bind(self), value);
-    } else { // value it not object or function
+      // Note: should get valuePromise's value to self promise, so you should call another doResolve
+      // just like valuePromise.then(function (value) { self.resolve(self, value) })
+      // but it will cause construct one more promise
+      TypedPromise.doResolve(value.then.bind(value), self);
+    } else { // value is neither object nor function
       self._state = PromiseState.FULFILLED;
       self._value = value;
       // Note: deal with deferred
@@ -141,3 +139,5 @@ export default class TypedPromise {
     }
   }
 }
+
+

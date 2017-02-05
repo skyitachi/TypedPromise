@@ -1,43 +1,40 @@
 "use strict";
-var asap_1 = require("./lib/asap");
+const asap_1 = require("./lib/asap");
 function noop() {
 }
+let count = 0;
 function thenable(x) {
     return x && x.then && x.then instanceof Function;
 }
-var Deferred = (function () {
-    function Deferred(boundedPromise, onFulfilled, onRejected) {
+class Deferred {
+    constructor(boundedPromise, onFulfilled, onRejected) {
         this.onFulfilled = onFulfilled;
         this.onRejected = onRejected;
         this.promise = boundedPromise;
     }
-    return Deferred;
-}());
-var TypedPromise = (function () {
-    function TypedPromise(executor) {
-        this._defaultResolver = function (_) {
-        };
-        this._defaultRejecter = function (_) {
-        };
+}
+class TypedPromise {
+    constructor(executor) {
         this._state = 0 /* PENDING */;
         this._value = null;
         this._reason = null;
         this._deferredState = 0 /* INITIAL */;
         this._deferred = null;
+        // test
+        this._name = count++;
         this._executor = executor;
-        // TODO: why?
         if (executor === noop)
             return;
         TypedPromise.doResolve(this._executor, this);
     }
-    TypedPromise.prototype.then = function (onFulfilled, onRejected) {
-        var ret = new TypedPromise(noop);
+    then(onFulfilled, onRejected) {
+        const ret = new TypedPromise(noop);
         // deal it as deferred
         TypedPromise.handle(this, new Deferred(ret, onFulfilled, onRejected));
         return ret;
-    };
-    TypedPromise.doResolve = function (execute, promise) {
-        var done = false;
+    }
+    static doResolve(execute, promise) {
+        let done = false;
         execute(function (value) {
             if (done)
                 return;
@@ -49,14 +46,18 @@ var TypedPromise = (function () {
             done = true;
             TypedPromise.reject(promise, reason);
         });
-    };
+    }
     // Promise Resolve Procedure
-    TypedPromise.resolve = function (self, value) {
+    static resolve(self, value) {
         if (self === value) {
             throw new TypeError("promise cannot resolve self");
         }
-        // if value is thenable
+        // if value is TypedPromise instance
         if (value instanceof TypedPromise) {
+            // Note: should get valuePromise's value to self promise, so you should call another doResolve
+            // just like valuePromise.then(function (value) { self.resolve(self, value) })
+            // but it will cause construct one more promise
+            TypedPromise.doResolve(value.then.bind(value), self);
         }
         else {
             self._state = 1 /* FULFILLED */;
@@ -66,33 +67,33 @@ var TypedPromise = (function () {
                 TypedPromise.handle(self, self._deferred);
             }
         }
-    };
-    TypedPromise.reject = function (promise, reason) {
+    }
+    static reject(promise, reason) {
         promise._state = 2 /* REJECTED */;
         promise._reason = reason;
-    };
-    TypedPromise.handleResolved = function (self, deferred) {
-        var cb = deferred.onFulfilled;
+    }
+    static handleResolved(self, deferred) {
+        const cb = deferred.onFulfilled;
         if (cb) {
             // behavior like micro tasks
-            asap_1["default"](function () {
+            asap_1.default(function () {
                 // newValue can be promise instance
-                var newValue = cb(self._value);
+                const newValue = cb(self._value);
                 TypedPromise.resolve(deferred.promise, newValue);
             });
         }
-    };
-    TypedPromise.handleRejected = function (self, deferred) {
-        var cb = deferred.onRejected;
+    }
+    static handleRejected(self, deferred) {
+        const cb = deferred.onRejected;
         if (cb) {
             // behavior like micro tasks
-            asap_1["default"](function () {
-                var reason = cb(self._reason);
+            asap_1.default(function () {
+                const reason = cb(self._reason);
                 TypedPromise.reject(self, reason);
             });
         }
-    };
-    TypedPromise.handle = function (self, deferred) {
+    }
+    static handle(self, deferred) {
         // while(self._state === PromiseState.ADOPTED) {
         //   self = self._value;
         // }
@@ -114,8 +115,7 @@ var TypedPromise = (function () {
                 // unexpected state
                 break;
         }
-    };
-    return TypedPromise;
-}());
-exports.__esModule = true;
-exports["default"] = TypedPromise;
+    }
+}
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.default = TypedPromise;

@@ -67,32 +67,32 @@ describe("TypedPromise basic api", function () {
     });
   });
 
-  // it("promise chain first", function (done) {
-  //   const tp = new TypedPromise(function (resolve, reject) {
-  //     resolve(new TypedPromise(function (resolve, reject) {
-  //       resolve("chain");
-  //     }));
-  //   });
-  //   tp
-  //     .then(function (value) {
-  //       assert(value === "chain");
-  //       done();
-  //     });
-  // });
+  it("promise chain (one then)", function (done) {
+    const tp = new TypedPromise(function (resolve) {
+      resolve(new TypedPromise(function (resolve) {
+        resolve("chain");
+      }));
+    });
+    tp
+      .then(function (value) {
+        assert(value === "chain");
+        done();
+      });
+  });
 
-  // it("promise chain", function (done) {
-  //   const tp = new TypedPromise(function (resolve, reject) {
-  //     resolve("ok");
-  //   });
-  //   tp
-  //     .then(function () {
-  //       return new TypedPromise(function (resolve, reject) {
-  //         resolve("chain");
-  //       });
-  //     })
-  //     .then(function (value) {
-  //       assert(value === "chain");
-  //       done();
-  //     });
-  // });
+  it("promise chain (two then)", function (done) {
+    const tp = new TypedPromise(function (resolve) {
+      resolve("ok");
+    });
+    tp
+      .then(function () {
+        return new TypedPromise(function (resolve) {
+          resolve("chain");
+        });
+      })
+      .then(function (value) {
+        assert(value === "chain");
+        done();
+      });
+  });
 });

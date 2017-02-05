@@ -1,11 +1,11 @@
 {
-  "name": "promise",
+  "name": "typed-promise",
   "version": "0.0.1",
   "description": "Typed Promise",
   "main": "index.js",
   "scripts": {
     "test": "./node_modules/.bin/mocha test/test.js",
-    "build": "tsc --module commonjs index.ts"
+    "build": "tsc --module commonjs --target ES6 index.ts"
   },
   "keywords": [],
   "author": "",
