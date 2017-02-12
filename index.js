@@ -3,9 +3,6 @@ const asap_1 = require("./lib/asap");
 function noop() {
 }
 let count = 0;
-function thenable(x) {
-    return x && x.then && x.then instanceof Function;
-}
 class Deferred {
     constructor(boundedPromise, onFulfilled, onRejected) {
         this.onFulfilled = onFulfilled;
@@ -20,8 +17,6 @@ class TypedPromise {
         this._reason = null;
         this._deferredState = 0 /* INITIAL */;
         this._deferred = null;
-        // test
-        this._name = count++;
         this._executor = executor;
         if (executor === noop)
             return;
@@ -71,15 +66,24 @@ class TypedPromise {
     static reject(promise, reason) {
         promise._state = 2 /* REJECTED */;
         promise._reason = reason;
+        if (promise._deferredState === 1 /* RESOLVABLE */) {
+            TypedPromise.handle(promise, promise._deferred);
+        }
     }
     static handleResolved(self, deferred) {
         const cb = deferred.onFulfilled;
         if (cb) {
             // behavior like micro tasks
             asap_1.default(function () {
-                // newValue can be promise instance
-                const newValue = cb(self._value);
-                TypedPromise.resolve(deferred.promise, newValue);
+                try {
+                    // newValue can be promise instance
+                    const newValue = cb(self._value);
+                    TypedPromise.resolve(deferred.promise, newValue);
+                }
+                catch (error) {
+                    // TODO how make error catchable;
+                    TypedPromise.reject(self, error);
+                }
             });
         }
     }
@@ -88,8 +92,13 @@ class TypedPromise {
         if (cb) {
             // behavior like micro tasks
             asap_1.default(function () {
-                const reason = cb(self._reason);
-                TypedPromise.reject(self, reason);
+                try {
+                    const reason = cb(self._reason);
+                    TypedPromise.reject(deferred.promise, reason);
+                }
+                catch (err) {
+                    TypedPromise.reject(self, err);
+                }
             });
         }
     }

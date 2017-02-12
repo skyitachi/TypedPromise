@@ -1,10 +1,9 @@
 import asap from "./lib/asap";
+
+type CallbackFunction = (any) => any;
 function noop() {
 }
 let count = 0;
-function thenable(x) {
-  return x && x.then && x.then instanceof Function;
-}
 
 const enum PromiseState {
   PENDING,
@@ -37,8 +36,6 @@ export default class TypedPromise {
   private _reason = null;
   private _deferredState = DeferredState.INITIAL;
   private _deferred = null;
-  // test
-  private _name = count++;
 
   constructor(executor: Function) {
     this._executor = executor;
@@ -46,7 +43,7 @@ export default class TypedPromise {
     TypedPromise.doResolve(this._executor, this);
   }
 
-  public then(onFulfilled ?: any, onRejected ?: any): TypedPromise {
+  public then(onFulfilled ?: CallbackFunction, onRejected ?: CallbackFunction): TypedPromise {
     const ret = new TypedPromise(noop);
     // deal it as deferred
     TypedPromise.handle(this, new Deferred(ret, onFulfilled, onRejected));
@@ -90,6 +87,9 @@ export default class TypedPromise {
   private static reject(promise: TypedPromise, reason: any) {
     promise._state = PromiseState.REJECTED;
     promise._reason = reason;
+    if (promise._deferredState === DeferredState.RESOLVABLE) {
+      TypedPromise.handle(promise, promise._deferred);
+    }
   }
 
   private static handleResolved(self: TypedPromise, deferred: Deferred) {
@@ -97,9 +97,14 @@ export default class TypedPromise {
     if (cb) {
       // behavior like micro tasks
       asap(function () {
-        // newValue can be promise instance
-        const newValue = cb(self._value);
-        TypedPromise.resolve(deferred.promise, newValue);
+        try {
+          // newValue can be promise instance
+          const newValue = cb(self._value);
+          TypedPromise.resolve(deferred.promise, newValue);
+        } catch (error) {
+          // TODO how make error catchable;
+          TypedPromise.reject(self, error);
+        }
       });
     }
   }
@@ -109,8 +114,12 @@ export default class TypedPromise {
     if (cb) {
       // behavior like micro tasks
       asap(function () {
-        const reason = cb(self._reason);
-        TypedPromise.reject(self, reason);
+        try {
+          const reason = cb(self._reason);
+          TypedPromise.reject(deferred.promise, reason);
+        } catch (err) {
+          TypedPromise.reject(self, err);
+        }
       });
     }
   }
