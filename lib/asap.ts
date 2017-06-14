@@ -8,6 +8,10 @@ export default function asap(task: () => void):void {
     process.nextTick(function () {
       task();
     });
+  } else {
+    setImmediate(function() {
+      task();
+    });
   }
 }
 
