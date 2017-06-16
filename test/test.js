@@ -1,7 +1,7 @@
 const assert = require("assert");
 const TypedPromise = require("../index.js").default;
 
-describe("2.2.1", function () {
+describe("Promise/A+ specific test", function () {
 
   it("promise.then should resolve value as first promise", function (done) {
     const p = new TypedPromise(function (resolve) {
@@ -14,7 +14,7 @@ describe("2.2.1", function () {
     });
   });
 
-  describe("2.2.1.1 optional onFulfilled and onReject", function () {
+  describe("2.2.1 optional onFulfilled and onReject", function () {
     it("promise.then should always return new promise", function () {
       const p = new TypedPromise(function (resolve) {
         resolve("");
@@ -23,7 +23,7 @@ describe("2.2.1", function () {
       assert.equal(p === p1, false);
     });
 
-    it("promise.then should ignore none function onFulfilled, onReject", function (done) {
+    it("2.2.1.1 If onFulfilled is not a function, it must be ignored", function (done) {
       const VALUE = "ok";
       const p = new TypedPromise(function (resolve) {
         resolve(VALUE);
@@ -35,6 +35,23 @@ describe("2.2.1", function () {
           done();
         });
     });
+    
+    it("2.2.1.2 If onRejected is not a function, it must be ignored.", function (done) {
+      const REASON = "failed";
+      const p = new TypedPromise(function (resolve, reject) {
+        reject(REASON);
+      });
+      p
+        .then()
+        .then("onFullfilled", function (reason) {
+          assert(reason === REASON);
+          done();
+        });
+    });
+  });
+
+  describe("2.2.2 If onFulfilled is a function", function () {
+    it("2.2.2.1 ", function (done) {});
   });
 });
 

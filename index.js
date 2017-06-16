@@ -17,7 +17,7 @@ var TypedPromise = (function () {
         this._value = null;
         this._reason = null;
         this._deferredState = 0 /* INITIAL */;
-        this._deferred = null;
+        this._deferred = []; // Note: multiple then will cause multiple deferreds 
         this._executor = executor;
         if (executor === noop)
             return;
@@ -63,7 +63,10 @@ function resolve(self, value) {
         self._value = value;
         // Note: deal with deferred
         if (self._deferredState === 1 /* RESOLVABLE */) {
-            handle(self, self._deferred);
+            self._deferred.forEach(function (deferred) {
+                handle(self, deferred);
+            });
+            self._deferred = [];
         }
     }
 }
@@ -71,7 +74,10 @@ function reject(self, reason) {
     self._state = 2 /* REJECTED */;
     self._reason = reason;
     if (self._deferredState === 1 /* RESOLVABLE */) {
-        handle(self, self._deferred);
+        self._deferred.forEach(function (deferred) {
+            handle(self, deferred);
+        });
+        self._deferred = [];
     }
 }
 function handleResolved(self, deferred) {
@@ -123,7 +129,10 @@ function handle(self, deferred) {
             // Note: stash the deferred, wait for the async task in current promise
             if (self._deferredState === 0 /* INITIAL */) {
                 self._deferredState = 1 /* RESOLVABLE */;
-                self._deferred = deferred;
+                self._deferred.push(deferred);
+            }
+            else if (self._deferredState === 1 /* RESOLVABLE */) {
+                self._deferred.push(deferred);
             }
             break;
         case 1 /* FULFILLED */:

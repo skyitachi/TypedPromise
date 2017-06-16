@@ -37,7 +37,7 @@ export default class TypedPromise<T> {
   _value = null;
   _reason = null;
   _deferredState = DeferredState.INITIAL;
-  _deferred = null;
+  _deferred = []; // Note: multiple then will cause multiple deferreds 
 
   constructor(executor: ExecuteInterface<T>) {
     this._executor = executor;
@@ -45,7 +45,7 @@ export default class TypedPromise<T> {
     doResolve(this._executor, this);
   }
 
-  public then(onFulfilled ?: Function, onRejected ?: Function): TypedPromise<T> {
+  public then(onFulfilled?: Function, onRejected?: Function): TypedPromise<T> {
     const ret = new TypedPromise(noop);
     // deal it as deferred
     handle(this, new Deferred(ret, onFulfilled, onRejected));
@@ -83,7 +83,10 @@ function resolve<T>(self: TypedPromise<T>, value: any) {
     self._value = value;
     // Note: deal with deferred
     if (self._deferredState === DeferredState.RESOLVABLE) {
-      handle(self, self._deferred);
+      self._deferred.forEach(function (deferred) {
+        handle(self, deferred);
+      });
+      self._deferred = [];
     }
   }
 }
@@ -92,7 +95,10 @@ function reject<T>(self: TypedPromise<T>, reason: any) {
   self._state = PromiseState.REJECTED;
   self._reason = reason;
   if (self._deferredState === DeferredState.RESOLVABLE) {
-    handle(self, self._deferred);
+    self._deferred.forEach(function (deferred) {
+      handle(self, deferred);
+    });
+    self._deferred = [];
   }
 }
 
@@ -143,7 +149,9 @@ function handle<T>(self: TypedPromise<T>, deferred: Deferred<T>) {
       // Note: stash the deferred, wait for the async task in current promise
       if (self._deferredState === DeferredState.INITIAL) {
         self._deferredState = DeferredState.RESOLVABLE;
-        self._deferred = deferred;
+        self._deferred.push(deferred);
+      } else if (self._deferredState === DeferredState.RESOLVABLE) {
+        self._deferred.push(deferred);
       }
       break;
     case PromiseState.FULFILLED:
