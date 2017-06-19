@@ -92,7 +92,7 @@ function handleResolved(self, deferred) {
             }
             catch (error) {
                 // TODO how make error catchable;
-                reject(self, error);
+                reject(deferred.promise, error);
             }
         });
     }
@@ -108,10 +108,10 @@ function handleRejected(self, deferred) {
         asap_1["default"](function () {
             try {
                 var newReason = cb(self._reason);
-                reject(deferred.promise, newReason);
+                resolve(deferred.promise, newReason);
             }
-            catch (err) {
-                reject(self, err);
+            catch (error) {
+                reject(deferred.promise, error);
             }
         });
     }

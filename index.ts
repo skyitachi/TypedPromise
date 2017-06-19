@@ -113,7 +113,7 @@ function handleResolved<T>(self: TypedPromise<T>, deferred: Deferred<T>) {
         resolve(deferred.promise, newValue);
       } catch (error) {
         // TODO how make error catchable;
-        reject(self, error);
+        reject(deferred.promise, error);
       }
     });
   } else {
@@ -129,9 +129,11 @@ function handleRejected<T>(self: TypedPromise<T>, deferred: Deferred<T>) {
     asap(function () {
       try {
         const newReason = cb(self._reason);
-        reject(deferred.promise, newReason);
-      } catch (err) {
-        reject(self, err);
+        // if onReject normally return,
+        // will make the defferred promise resolvable
+        resolve(deferred.promise, newReason);
+      } catch (error) {
+        reject(deferred.promise, error);
       }
     });
   } else {
