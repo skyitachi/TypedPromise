@@ -7,6 +7,9 @@
 In other words, no need to check the type. However, in compiled javascript, *it will cause error*, *this library just for
 typescript use*.
 
+- pass all tests by [promises-tests](https://github.com/promises-aplus/promises-tests)
+
 #### TODO
-- all errors happened in then handlers should bubble up and can be catchable
+- [ x ] all errors happened in then handlers should bubble up and can be catchable
+- [ ] clean code
 

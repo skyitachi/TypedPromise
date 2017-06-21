@@ -1,5 +1,13 @@
 import asap from "./lib/asap";
-import { isFunction } from "./lib/util";
+import { isFunction, isObject, isThenable, getThen, isNull } from "./lib/util";
+import debug from "debug";
+
+const unbounded = Symbol("unbounded");
+const resolveCallMap = new Map();
+const rejectCallMap = new Map();
+
+let count = 0; // promise id
+const d = debug("promise");
 
 function noop() { }
 
@@ -13,6 +21,11 @@ const enum PromiseState {
 const enum DeferredState {
   INITIAL,
   RESOLVABLE
+}
+
+const enum ResolveCallState {
+  BEFORE_CALL = 1,
+  CALLED
 }
 
 class Deferred<T> {
@@ -38,6 +51,7 @@ export default class TypedPromise<T> {
   _reason = null;
   _deferredState = DeferredState.INITIAL;
   _deferred = []; // Note: multiple then will cause multiple deferreds 
+  _id = count++;
 
   constructor(executor: ExecuteInterface<T>) {
     this._executor = executor;
@@ -53,16 +67,19 @@ export default class TypedPromise<T> {
   }
 }
 
-
 function doResolve<T>(execute: ExecuteInterface<T>, promise: TypedPromise<T>) {
   let done = false;
+  d("in the doResolve: ", promise._id);
   execute(function (value) {
     if (done) return;
     done = true;
+    d("in the execute");
+    resolveCallMap.set(execute, ResolveCallState.CALLED);
     resolve(promise, value);
   }, function (reason) {
     if (done) return;
     done = true;
+    rejectCallMap.set(execute, ResolveCallState.CALLED);
     reject(promise, reason);
   });
 }
@@ -72,22 +89,50 @@ function resolve<T>(self: TypedPromise<T>, value: any) {
   if (self === value) {
     throw new TypeError("promise cannot resolve self");
   }
-  // if value is TypedPromise instance
-  if (value instanceof TypedPromise) {
-    // Note: should get valuePromise's value to self promise, so you should call another doResolve
-    // just like valuePromise.then(function (value) { self.resolve(self, value) })
-    // but it will cause construct one more promise
-    doResolve(value.then.bind(value), self);
-  } else { // value is neither object nor function
+  let boundedThen: any = unbounded;
+  if (!isObject(value)) {
     self._state = PromiseState.FULFILLED;
     self._value = value;
-    // Note: deal with deferred
-    if (self._deferredState === DeferredState.RESOLVABLE) {
-      self._deferred.forEach(function (deferred) {
-        handle(self, deferred);
-      });
-      self._deferred = [];
+    d("resolved: ", value, self._id);
+  } else {
+    // specification 2.3.3.1
+    // if value is TypedPromise instance
+    try {
+      const then = getThen(value);
+      if (isFunction(then)) {
+        boundedThen = then.bind(value);
+        d("from the resolve");
+        // Note: should get valuePromise's value to self promise, so you should call another doResolve
+        // just like valuePromise.then(function (value) { self.resolve(self, value) })
+        // but it will cause construct one more promise
+        resolveCallMap.set(boundedThen, ResolveCallState.BEFORE_CALL);
+        doResolve(boundedThen, self);
+        return;
+      } else {
+        self._state = PromiseState.FULFILLED;
+        self._value = value;
+      }
+    } catch (error) {
+      // 2.3.3.3.4 if rejectPromise called all error ignored
+      if (rejectCallMap.get(boundedThen) === ResolveCallState.CALLED) return;
+      d("reject call state:", rejectCallMap.get(boundedThen));
+      if (boundedThen === unbounded) {
+        self._state = PromiseState.REJECTED;
+        self._reason = error;
+      } else if (resolveCallMap.get(boundedThen) === ResolveCallState.BEFORE_CALL) {
+        d("resolve call state: ", resolveCallMap.get(boundedThen), self._id);
+        self._state = PromiseState.REJECTED;
+        self._reason = error;
+      }
+      d("in the error: ", self._state);
     }
+  }
+  if (self._state !== PromiseState.PENDING
+    && self._deferredState === DeferredState.RESOLVABLE) {
+    self._deferred.forEach(function (deferred) {
+      handle(self, deferred);
+    });
+    self._deferred = [];
   }
 }
 
@@ -110,6 +155,7 @@ function handleResolved<T>(self: TypedPromise<T>, deferred: Deferred<T>) {
       try {
         // newValue can be promise instance
         const newValue = cb(self._value);
+        d("call deferred");
         resolve(deferred.promise, newValue);
       } catch (error) {
         // TODO how make error catchable;

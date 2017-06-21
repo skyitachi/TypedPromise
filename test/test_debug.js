@@ -48,25 +48,190 @@ const promise = d.promise;
 // }, 100);
 
 //
-const sentinel = { sentinel: "sentinel" };
+// const sentinel = { sentinel: "sentinel" };
 
-promise.then(null, function () {
-  return sentinel;
-}).then(function (value) {
-  console.log(value === sentinel);
-});
+// promise.then(null, function () {
+//   return sentinel;
+// }).then(function (value) {
+//   console.log(value === sentinel);
+// });
 
-promise.then(null, function () {
-  throw sentinel;
-}).then(null, function (reason) {
-  console.log(reason === sentinel);
-});
+// promise.then(null, function () {
+//   throw sentinel;
+// }).then(null, function (reason) {
+//   console.log(reason === sentinel);
+// });
 
-promise.then(null, function () {
-  return sentinel;
+// promise.then(null, function () {
+//   return sentinel;
+// })
+// .then(value => {
+//   console.log(value === sentinel);
+// });
+
+// d.reject("ok");
+
+// const thenable = Object.create(null, {
+//   then: {
+//     get: function () {
+//       return (fulfilled) => {
+//         // fulfilled("thenable");
+//         // throw new Error("has fulfilled");
+//         setTimeout(() => {
+//           fulfilled("thenable");
+//           // throw new Error("has fulfilled");
+//         }, 0);
+//       };
+//     }
+//   }
+// });
+
+
+// const plainObject = { "hello": 2 };
+
+// const sPromise = new TypedPromise(function (resolve) {
+//   resolve(plainObject);
+// })
+// .then(function (v) {
+//   console.log(v);
+//   return thenable;
+// })
+// .then(function (v) {
+//   console.log(v);
+// });
+
+// const sPromise2 = new Promise(function (resolve) {
+//   resolve(thenable);
+// })
+// .then(function (v) {
+//   console.log(v);
+//   return thenable;
+// })
+// .then(function (v) {
+//   console.log(v);
+// });
+// let called = false;
+
+// 2.3.3.3.1
+// const thenable = {
+//   then: function (fulfilled) {
+//     setTimeout(() => {
+//       fulfilled("thenable");
+//     }, 0);
+//   }
+// };
+// const outerThenableFactory = function (value) {
+//   return {
+//     then: function (fulfilled) {
+//       fulfilled(value);
+//       throw value;
+//     }
+//   }
+// }
+// promise.then(function (v1) {
+//   // return thenable;
+//   return outerThenableFactory(thenable);
+// })
+//   .then(function (v) {
+//     console.log("in the typedpromise");
+//     console.log(v);
+//   }, function (reason) {
+//     console.log("in the rejected");
+//     console.log(reason);
+//   });
+
+// d.resolve("ok");
+
+// Promise.resolve("ok")
+//   .then(function (v1) {
+//     return outerThenableFactory(thenable);
+//   })
+//   .then(function (v) {
+//     console.log("in the standard promise");
+//     console.log(v);
+//   }, function (r) {
+//     console.log(r);
+//   });
+
+// const yFactory = function (value) {
+//   return {
+//     then: function () {
+//       throw value;
+//     }
+//   }
+// };
+
+// const yFactoryAccessor = function (value) {
+//   return Object.create(null,
+//     {
+//       then: {
+//         get: function () {
+//           throw value;
+//         }
+//       }
+//     }
+//   );
+// };
+
+// const xFactory = function (value) {
+//   return {
+//     then: function (resolvePromise) {
+//       resolvePromise(value);
+//     }
+//   }
+// };
+
+// promise.then(function () {
+//   return xFactory(yFactoryAccessor("ok"));
+// })
+//   .then(function (v) {
+//     console.log(v);
+//   }, function (r) {
+//     console.log("in the typed promise");
+//     console.log(r);
+//   });
+
+// d.resolve("ok");
+
+// Promise.resolve("ok")
+//   .then(function () {
+//     return xFactory(yFactoryAccessor("ok"));
+//   })
+//   .then(function (v) {
+//     console.log(v);
+//   }, function (r) {
+//     console.log("in the standard promise");
+//     console.log(r);
+//   });
+
+const xFactory = function (value) {
+  return {
+    then: function (resolvePromise, rejectPromise) {
+      rejectPromise(value);
+      throw other;
+    }
+  };
+}
+
+promise.then(function () {
+  return xFactory("test reject");
 })
-.then(value => {
-  console.log(value === sentinel);
-});
+  .then(function (v) {
+    console.log(v);
+  }, function (r) {
+    console.log("in the typed promise");
+    console.log(r);
+  });
 
-d.reject("ok");
+d.resolve("ok");
+
+Promise.resolve("ok")
+  .then(function () {
+    return xFactory("test reject");
+  })
+  .then(function (v) {
+    console.log(v);
+  }, function (r) {
+    console.log("in the standard promise");
+    console.log(r);
+  });
