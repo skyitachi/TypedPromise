@@ -1,6 +1,6 @@
 ### Introduction
 
-- Promise/A+ implementation based on Typescript, support more type inference ability
+- Promise/A+ implementation based on Typescript, support more type inference ablity
 
 #### claims
 - In `Promises/A+` 2.2.1 `onFulfilled` and `onRejected` needs check, but in typescript, type check would work static.
