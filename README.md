@@ -10,6 +10,6 @@ typescript use*.
 - pass all tests by [promises-tests](https://github.com/promises-aplus/promises-tests)
 
 #### TODO
-- [ x ] all errors happened in then handlers should bubble up and can be catchable
+- [x] all errors happened in then handlers should bubble up and can be catchable
 - [ ] clean code
 
