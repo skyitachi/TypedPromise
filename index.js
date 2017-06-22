@@ -6,9 +6,7 @@ const debug_1 = require("debug");
 const unbounded = Symbol("unbounded");
 const resolveCallMap = new Map();
 const rejectCallMap = new Map();
-const inThenChain = new Map();
-const resolveErrorMap = new Map();
-let count = 0;
+let count = 0; // promise id
 const d = debug_1.default("promise");
 function noop() { }
 class Deferred {
@@ -59,11 +57,6 @@ function doResolve(execute, promise) {
 }
 // Promise Resolve Procedure
 function resolve(self, value) {
-    // if (resolveCallMap.get(value) === ResolveCallState.BEFORE_CALL) {
-    //   // doResolve -> resolve
-    //   resolveCallMap.set(value, ResolveCallState.CALLED);
-    // }
-    // d("in the resolve: ", value, resolveCallMap.get(self), self._id);
     if (self === value) {
         throw new TypeError("promise cannot resolve self");
     }
@@ -78,18 +71,14 @@ function resolve(self, value) {
         // if value is TypedPromise instance
         try {
             const then = util_1.getThen(value);
-            // Note: should get valuePromise's value to self promise, so you should call another doResolve
-            // just like valuePromise.then(function (value) { self.resolve(self, value) })
-            // but it will cause construct one more promise
             if (util_1.isFunction(then)) {
                 boundedThen = then.bind(value);
                 d("from the resolve");
-                // inThenChain.set(value, true);
+                // Note: should get valuePromise's value to self promise, so you should call another doResolve
+                // just like valuePromise.then(function (value) { self.resolve(self, value) })
+                // but it will cause construct one more promise
                 resolveCallMap.set(boundedThen, 1 /* BEFORE_CALL */);
-                // if (resolveCallMap.get(value) !== ResolveCallState.CALLED) {
-                // }
                 doResolve(boundedThen, self);
-                // 判断
                 return;
             }
             else {
@@ -98,6 +87,7 @@ function resolve(self, value) {
             }
         }
         catch (error) {
+            // 2.3.3.3.4 if rejectPromise called all error ignored
             if (rejectCallMap.get(boundedThen) === 2 /* CALLED */)
                 return;
             d("reject call state:", rejectCallMap.get(boundedThen));
@@ -110,23 +100,14 @@ function resolve(self, value) {
                 self._state = 2 /* REJECTED */;
                 self._reason = error;
             }
-            // if (!resolveCallMap.has(value) || resolveCallMap.get(value) === ResolveCallState.BEFORE_CALL) {
-            // }
-            // else if (inThenChain.get(self)) {
-            //   self._state = PromiseState.REJECTED;
-            //   self._reason = error;
-            // }
             d("in the error: ", self._state);
-            // if onFulfilled doesn't invoke， should reject the error
-            // self._state = PromiseState.REJECTED;
-            // self._reason = error;
-            // doResolve exception should ignore if promise resolved or rejected
-            // if (self._state === PromiseState.PENDING) {
-            // }
         }
     }
     if (self._state !== 0 /* PENDING */
         && self._deferredState === 1 /* RESOLVABLE */) {
+        // prevent memory leak
+        resolveCallMap.delete(boundedThen);
+        rejectCallMap.delete(boundedThen);
         self._deferred.forEach(function (deferred) {
             handle(self, deferred);
         });

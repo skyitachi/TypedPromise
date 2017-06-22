@@ -1,5 +1,5 @@
 import asap from "./lib/asap";
-import { isFunction, isObject, isThenable, getThen, isNull } from "./lib/util";
+import { isFunction, isObject, getThen } from "./lib/util";
 import debug from "debug";
 
 const unbounded = Symbol("unbounded");
@@ -23,7 +23,7 @@ const enum DeferredState {
   RESOLVABLE
 }
 
-const enum ResolveCallState {
+const enum CallState {
   BEFORE_CALL = 1,
   CALLED
 }
@@ -74,12 +74,12 @@ function doResolve<T>(execute: ExecuteInterface<T>, promise: TypedPromise<T>) {
     if (done) return;
     done = true;
     d("in the execute");
-    resolveCallMap.set(execute, ResolveCallState.CALLED);
+    resolveCallMap.set(execute, CallState.CALLED);
     resolve(promise, value);
   }, function (reason) {
     if (done) return;
     done = true;
-    rejectCallMap.set(execute, ResolveCallState.CALLED);
+    rejectCallMap.set(execute, CallState.CALLED);
     reject(promise, reason);
   });
 }
@@ -105,7 +105,7 @@ function resolve<T>(self: TypedPromise<T>, value: any) {
         // Note: should get valuePromise's value to self promise, so you should call another doResolve
         // just like valuePromise.then(function (value) { self.resolve(self, value) })
         // but it will cause construct one more promise
-        resolveCallMap.set(boundedThen, ResolveCallState.BEFORE_CALL);
+        resolveCallMap.set(boundedThen, CallState.BEFORE_CALL);
         doResolve(boundedThen, self);
         return;
       } else {
@@ -114,12 +114,12 @@ function resolve<T>(self: TypedPromise<T>, value: any) {
       }
     } catch (error) {
       // 2.3.3.3.4 if rejectPromise called all error ignored
-      if (rejectCallMap.get(boundedThen) === ResolveCallState.CALLED) return;
+      if (rejectCallMap.get(boundedThen) === CallState.CALLED) return;
       d("reject call state:", rejectCallMap.get(boundedThen));
       if (boundedThen === unbounded) {
         self._state = PromiseState.REJECTED;
         self._reason = error;
-      } else if (resolveCallMap.get(boundedThen) === ResolveCallState.BEFORE_CALL) {
+      } else if (resolveCallMap.get(boundedThen) === CallState.BEFORE_CALL) {
         d("resolve call state: ", resolveCallMap.get(boundedThen), self._id);
         self._state = PromiseState.REJECTED;
         self._reason = error;
@@ -127,8 +127,14 @@ function resolve<T>(self: TypedPromise<T>, value: any) {
       d("in the error: ", self._state);
     }
   }
-  if (self._state !== PromiseState.PENDING
-    && self._deferredState === DeferredState.RESOLVABLE) {
+  if (
+    self._state !== PromiseState.PENDING
+    && self._deferredState === DeferredState.RESOLVABLE
+  ) {
+    // prevent memory leak
+    resolveCallMap.delete(boundedThen);
+    rejectCallMap.delete(boundedThen);
+
     self._deferred.forEach(function (deferred) {
       handle(self, deferred);
     });
